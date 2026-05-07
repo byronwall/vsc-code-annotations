@@ -1,21 +1,34 @@
 import * as vscode from "vscode";
 
-import { AnnotationTreeItem, AnnotationTreeProvider } from "./annotations";
+import {
+  AnnotationListTreeItem,
+  AnnotationTreeItem,
+  AnnotationTreeProvider,
+} from "./annotations";
 import { AnnotationCodeLensProvider } from "./annotationCodeLens";
 import {
   addAnnotation,
+  createNewAnnotationList,
   FILE_ANNOTATION_SUMMARY_COMMAND,
   fixAnnotationLocation,
+  openAnnotationDocumentLocation,
   openAnnotationsDocument,
   openFileAnnotations,
+  removeAnnotation,
+  setActiveAnnotationList,
 } from "./annotationCommands";
+import { AnnotationListState } from "./annotationListState";
 import { openSourceLocation } from "./annotationNavigation";
 import { resolveActiveWorkspaceFolder } from "./annotationWorkspace";
 
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
-  const treeProvider = new AnnotationTreeProvider(resolveActiveWorkspaceFolder);
+  const listState = new AnnotationListState(context.workspaceState);
+  const treeProvider = new AnnotationTreeProvider(
+    resolveActiveWorkspaceFolder,
+    listState,
+  );
   const codeLensProvider = new AnnotationCodeLensProvider(
     resolveActiveWorkspaceFolder,
   );
@@ -35,7 +48,9 @@ export async function activate(
     vscode.commands.registerCommand(
       "codeAnnotations.addAnnotation",
       async () => {
-        await addAnnotation(treeProvider);
+        await addAnnotation(listState, () =>
+          refreshProviders(treeProvider, codeLensProvider),
+        );
       },
     ),
     vscode.commands.registerCommand(
@@ -49,10 +64,30 @@ export async function activate(
     ),
     vscode.commands.registerCommand(
       "codeAnnotations.openAnnotationsDocument",
-      openAnnotationsDocument,
+      async (target?: AnnotationListTreeItem | AnnotationTreeItem) => {
+        await openAnnotationsDocument(listState, target);
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.createAnnotationList",
+      async () => {
+        await createNewAnnotationList(listState, () =>
+          refreshProviders(treeProvider, codeLensProvider),
+        );
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.setActiveAnnotationList",
+      async (target?: AnnotationListTreeItem) => {
+        await setActiveAnnotationList(
+          listState,
+          () => refreshProviders(treeProvider, codeLensProvider),
+          target,
+        );
+      },
     ),
     vscode.commands.registerCommand("codeAnnotations.refresh", () => {
-      treeProvider.refresh();
+      refreshProviders(treeProvider, codeLensProvider);
     }),
     vscode.commands.registerCommand(
       "codeAnnotations.openSourceLocation",
@@ -63,7 +98,25 @@ export async function activate(
     vscode.commands.registerCommand(
       "codeAnnotations.fixAnnotationLocation",
       async (target: AnnotationTreeItem) => {
-        await fixAnnotationLocation(treeProvider, target);
+        await fixAnnotationLocation(
+          () => refreshProviders(treeProvider, codeLensProvider),
+          target,
+        );
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.openAnnotationDocumentLocation",
+      async (target: AnnotationTreeItem) => {
+        await openAnnotationDocumentLocation(target);
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.deleteAnnotation",
+      async (target: AnnotationTreeItem) => {
+        await removeAnnotation(
+          () => refreshProviders(treeProvider, codeLensProvider),
+          target,
+        );
       },
     ),
     vscode.commands.registerCommand(

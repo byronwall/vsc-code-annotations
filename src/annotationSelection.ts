@@ -19,11 +19,9 @@ export function buildSelectionDraft(
   workspaceFolder: vscode.WorkspaceFolder,
 ): AnnotationSelectionDraft | undefined {
   const selection = editor.selection;
-  if (selection.isEmpty) {
-    return undefined;
-  }
-
-  const code = editor.document.getText(selection).trimEnd();
+  const code = selection.isEmpty
+    ? editor.document.getText().trimEnd()
+    : editor.document.getText(selection).trimEnd();
   if (!code.trim()) {
     return undefined;
   }
@@ -31,9 +29,10 @@ export function buildSelectionDraft(
   const relativePath = toPosix(
     path.relative(workspaceFolder.uri.fsPath, editor.document.uri.fsPath),
   );
-  const startLine = selection.start.line + 1;
-  const endLine =
-    selection.end.character === 0 && selection.end.line > selection.start.line
+  const startLine = selection.isEmpty ? 1 : selection.start.line + 1;
+  const endLine = selection.isEmpty
+    ? editor.document.lineCount
+    : selection.end.character === 0 && selection.end.line > selection.start.line
       ? selection.end.line
       : selection.end.line + 1;
 

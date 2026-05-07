@@ -56,6 +56,30 @@
                 "category": "Code Annotations",
                 "title": "Refresh Annotations",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "codeAnnotations.createAnnotationList",
+                "category": "Code Annotations",
+                "title": "New Annotation List",
+                "icon": "$(add)"
+            },
+            {
+                "command": "codeAnnotations.setActiveAnnotationList",
+                "category": "Code Annotations",
+                "title": "Set Active Annotation List",
+                "icon": "$(star-full)"
+            },
+            {
+                "command": "codeAnnotations.openAnnotationDocumentLocation",
+                "category": "Code Annotations",
+                "title": "Open Annotation In List",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "codeAnnotations.deleteAnnotation",
+                "category": "Code Annotations",
+                "title": "Delete Annotation",
+                "icon": "$(trash)"
             }
         ],
         "keybindings": [
@@ -63,13 +87,13 @@
                 "command": "codeAnnotations.addAnnotation",
                 "key": "ctrl+shift+0",
                 "mac": "cmd+shift+0",
-                "when": "editorTextFocus && editorHasSelection"
+                "when": "editorTextFocus"
             },
             {
                 "command": "codeAnnotations.addAnnotation",
                 "key": "ctrl+shift+numpad0",
                 "mac": "cmd+shift+numpad0",
-                "when": "editorTextFocus && editorHasSelection"
+                "when": "editorTextFocus"
             }
         ],
         "viewsContainers": {
@@ -105,6 +129,12 @@
                     "group": "navigation@1"
                 },
                 {
+                    "command": "codeAnnotations.createAnnotationList",
+                    "icon": "$(add)",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@1"
+                },
+                {
                     "command": "codeAnnotations.refresh",
                     "icon": "$(refresh)",
                     "when": "view == codeAnnotations.annotations",
@@ -114,16 +144,34 @@
             "editor/context": [
                 {
                     "command": "codeAnnotations.addAnnotation",
-                    "when": "editorTextFocus && editorHasSelection",
+                    "when": "editorTextFocus",
                     "group": "navigation@1"
                 }
             ],
             "view/item/context": [
                 {
+                    "command": "codeAnnotations.setActiveAnnotationList",
+                    "icon": "$(star-full)",
+                    "when": "view == codeAnnotations.annotations && viewItem == annotationListInactive",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "codeAnnotations.openAnnotationDocumentLocation",
+                    "icon": "$(go-to-file)",
+                    "when": "view == codeAnnotations.annotations && (viewItem == annotationEntryCurrent || viewItem == annotationEntryRelocated || viewItem == annotationEntryMissing)",
+                    "group": "inline@1"
+                },
+                {
                     "command": "codeAnnotations.fixAnnotationLocation",
                     "icon": "$(wrench)",
                     "when": "view == codeAnnotations.annotations && viewItem == annotationEntryRelocated",
-                    "group": "inline@1"
+                    "group": "inline@2"
+                },
+                {
+                    "command": "codeAnnotations.deleteAnnotation",
+                    "icon": "$(trash)",
+                    "when": "view == codeAnnotations.annotations && (viewItem == annotationEntryCurrent || viewItem == annotationEntryRelocated || viewItem == annotationEntryMissing)",
+                    "group": "inline@3"
                 }
             ]
         },

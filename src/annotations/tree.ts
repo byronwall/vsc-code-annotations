@@ -1,10 +1,12 @@
 import * as vscode from "vscode";
 
+import { AnnotationListState } from "../annotationListState";
 import {
   AnnotationEntry,
   AnnotationLocationResolution,
   resolveTypeIcon,
 } from "./model";
+import { AnnotationList, loadAnnotationLists } from "./lists";
 import {
   buildTooltip,
   buildTreeItemDescription,
@@ -27,6 +29,7 @@ export class AnnotationTreeProvider
     private readonly resolveWorkspaceFolder: () =>
       | vscode.WorkspaceFolder
       | undefined,
+    private readonly listState: AnnotationListState,
   ) {}
 
   public getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -36,6 +39,10 @@ export class AnnotationTreeProvider
   public async getChildren(
     element?: vscode.TreeItem,
   ): Promise<vscode.TreeItem[]> {
+    if (element instanceof AnnotationListTreeItem) {
+      return this.getListChildren(element);
+    }
+
     if (element) {
       return [];
     }
@@ -47,23 +54,14 @@ export class AnnotationTreeProvider
       ];
     }
 
-    const entries = await loadAnnotations(workspaceFolder);
-    if (entries.length === 0) {
-      return [
-        new MessageTreeItem(
-          `No annotations found in ${getAnnotationsDocumentPath()} yet.`,
+    const activeList = await this.listState.resolveActiveList(workspaceFolder);
+    const lists = await loadAnnotationLists(workspaceFolder);
+    return lists.map(
+      (list) =>
+        new AnnotationListTreeItem(
+          list,
+          list.relativePath === activeList.relativePath,
         ),
-      ];
-    }
-
-    return Promise.all(
-      entries.map(async (entry) => {
-        const resolution = await resolveAnnotationLocation(
-          workspaceFolder,
-          entry,
-        );
-        return new AnnotationTreeItem(entry, resolution);
-      }),
     );
   }
 
@@ -74,10 +72,63 @@ export class AnnotationTreeProvider
   public dispose(): void {
     this.onDidChangeTreeDataEmitter.dispose();
   }
+
+  private async getListChildren(
+    element: AnnotationListTreeItem,
+  ): Promise<vscode.TreeItem[]> {
+    const workspaceFolder = this.resolveWorkspaceFolder();
+    if (!workspaceFolder) {
+      return [];
+    }
+
+    const entries = await loadAnnotations(
+      workspaceFolder,
+      element.list.documentUri,
+    );
+    if (entries.length === 0) {
+      const documentPath = element.list.isDefault
+        ? getAnnotationsDocumentPath()
+        : element.list.relativePath;
+      return [
+        new MessageTreeItem(`No annotations found in ${documentPath} yet.`),
+      ];
+    }
+
+    return Promise.all(
+      entries.map(async (entry) => {
+        const resolution = await resolveAnnotationLocation(
+          workspaceFolder,
+          entry,
+        );
+        return new AnnotationTreeItem(element.list, entry, resolution);
+      }),
+    );
+  }
+}
+
+export class AnnotationListTreeItem extends vscode.TreeItem {
+  constructor(
+    public readonly list: AnnotationList,
+    public readonly isActive: boolean,
+  ) {
+    super(
+      list.name,
+      isActive
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.Collapsed,
+    );
+    this.contextValue = isActive
+      ? "annotationListActive"
+      : "annotationListInactive";
+    this.description = isActive ? "Active" : undefined;
+    this.iconPath = new vscode.ThemeIcon(isActive ? "star-full" : "list-tree");
+    this.tooltip = `${list.name}\n${list.relativePath}`;
+  }
 }
 
 export class AnnotationTreeItem extends vscode.TreeItem {
   constructor(
+    public readonly list: AnnotationList,
     public readonly entry: AnnotationEntry,
     public readonly resolution: AnnotationLocationResolution,
   ) {

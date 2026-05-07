@@ -11,7 +11,9 @@ import {
 } from "./model";
 import {
   collectAnnotationSections,
+  ParsedAnnotationSection,
   DOCUMENT_HEADER,
+  buildAnnotationsDocumentHeader,
   formatAnnotationEntry,
   parseAnnotationsDocument,
 } from "./markdown";
@@ -30,8 +32,9 @@ export function getAnnotationsDocumentUri(
 
 export async function ensureAnnotationsDocument(
   workspaceFolder: vscode.WorkspaceFolder,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
+  listName?: string,
 ): Promise<vscode.Uri> {
-  const documentUri = getAnnotationsDocumentUri(workspaceFolder);
   await vscode.workspace.fs.createDirectory(
     vscode.Uri.file(path.dirname(documentUri.fsPath)),
   );
@@ -41,18 +44,28 @@ export async function ensureAnnotationsDocument(
     return documentUri;
   }
 
-  await writeTextFile(documentUri, DOCUMENT_HEADER);
+  await writeTextFile(
+    documentUri,
+    listName ? buildAnnotationsDocumentHeader(listName) : DOCUMENT_HEADER,
+  );
   return documentUri;
 }
 
 export async function appendAnnotation(
   workspaceFolder: vscode.WorkspaceFolder,
   draft: AnnotationDraft,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
 ): Promise<AnnotationEntry> {
-  const documentUri = await ensureAnnotationsDocument(workspaceFolder);
-  await maybeEnsureAnnotationsDirectoryIgnored(workspaceFolder, documentUri);
+  const targetDocumentUri = await ensureAnnotationsDocument(
+    workspaceFolder,
+    documentUri,
+  );
+  await maybeEnsureAnnotationsDirectoryIgnored(
+    workspaceFolder,
+    targetDocumentUri,
+  );
 
-  const existing = (await readTextFile(documentUri)) ?? DOCUMENT_HEADER;
+  const existing = (await readTextFile(targetDocumentUri)) ?? DOCUMENT_HEADER;
   const entry: AnnotationEntry = {
     ...draft,
     comment: trimBlankLines(draft.comment.split(/\r?\n/)).join("\n"),
@@ -66,7 +79,7 @@ export async function appendAnnotation(
       : "\n\n";
   const nextContents = `${existing}${separator}${formatAnnotationEntry(entry)}`;
   await writeTextFile(
-    documentUri,
+    targetDocumentUri,
     nextContents.endsWith("\n") ? nextContents : `${nextContents}\n`,
   );
   return entry;
@@ -76,11 +89,18 @@ export async function updateAnnotationCodeRef(
   workspaceFolder: vscode.WorkspaceFolder,
   target: AnnotationEntry,
   nextCodeRef: AnnotationCodeRef,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
 ): Promise<AnnotationEntry | undefined> {
-  const documentUri = await ensureAnnotationsDocument(workspaceFolder);
-  await maybeEnsureAnnotationsDirectoryIgnored(workspaceFolder, documentUri);
+  const targetDocumentUri = await ensureAnnotationsDocument(
+    workspaceFolder,
+    documentUri,
+  );
+  await maybeEnsureAnnotationsDirectoryIgnored(
+    workspaceFolder,
+    targetDocumentUri,
+  );
 
-  const contents = await readTextFile(documentUri);
+  const contents = await readTextFile(targetDocumentUri);
   if (!contents) {
     return undefined;
   }
@@ -105,14 +125,14 @@ export async function updateAnnotationCodeRef(
   const nextContents = `${contents.slice(0, section.start)}${formatAnnotationEntry(
     updatedEntry,
   )}${contents.slice(section.end)}`;
-  await writeTextFile(documentUri, nextContents);
+  await writeTextFile(targetDocumentUri, nextContents);
   return updatedEntry;
 }
 
 export async function loadAnnotations(
   workspaceFolder: vscode.WorkspaceFolder,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
 ): Promise<AnnotationEntry[]> {
-  const documentUri = getAnnotationsDocumentUri(workspaceFolder);
   const contents = await readTextFile(documentUri);
   if (!contents) {
     return [];
@@ -125,7 +145,63 @@ export function isAnnotationsDocument(
   uri: vscode.Uri,
   workspaceFolder: vscode.WorkspaceFolder,
 ): boolean {
-  return getAnnotationsDocumentUri(workspaceFolder).fsPath === uri.fsPath;
+  const relativePath = toPosix(
+    path.relative(workspaceFolder.uri.fsPath, uri.fsPath),
+  );
+  if (relativePath === getConfiguredDocumentPath()) {
+    return true;
+  }
+
+  return (
+    relativePath.startsWith(`${getManagedListsDirectoryPath()}/`) &&
+    relativePath.toLowerCase().endsWith(".md")
+  );
+}
+
+export async function deleteAnnotation(
+  workspaceFolder: vscode.WorkspaceFolder,
+  target: AnnotationEntry,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
+): Promise<boolean> {
+  const targetDocumentUri = await ensureAnnotationsDocument(
+    workspaceFolder,
+    documentUri,
+  );
+  const contents = await readTextFile(targetDocumentUri);
+  if (!contents) {
+    return false;
+  }
+
+  const section = collectAnnotationSections(contents).find(({ entry }) =>
+    isSameAnnotationEntry(entry, target),
+  );
+  if (!section) {
+    return false;
+  }
+
+  const nextContents = `${contents.slice(0, section.start)}${contents.slice(
+    section.end,
+  )}`;
+  await writeTextFile(
+    targetDocumentUri,
+    nextContents.trimEnd() ? `${nextContents.trimEnd()}\n` : DOCUMENT_HEADER,
+  );
+  return true;
+}
+
+export async function findAnnotationSection(
+  workspaceFolder: vscode.WorkspaceFolder,
+  target: AnnotationEntry,
+  documentUri: vscode.Uri = getAnnotationsDocumentUri(workspaceFolder),
+): Promise<ParsedAnnotationSection | undefined> {
+  const contents = await readTextFile(documentUri);
+  if (!contents) {
+    return undefined;
+  }
+
+  return collectAnnotationSections(contents).find(({ entry }) =>
+    isSameAnnotationEntry(entry, target),
+  );
 }
 
 function getConfiguredDocumentPath(): string {
@@ -146,6 +222,11 @@ function getConfiguredDocumentPath(): string {
   }
 
   return normalized;
+}
+
+function getManagedListsDirectoryPath(): string {
+  const directory = path.posix.dirname(getConfiguredDocumentPath());
+  return directory === "." ? "lists" : path.posix.join(directory, "lists");
 }
 
 async function readTextFile(uri: vscode.Uri): Promise<string | undefined> {

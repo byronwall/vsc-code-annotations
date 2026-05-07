@@ -13,18 +13,25 @@ const ANNOTATION_HEADING_PATTERN =
 const COMMENT_SECTION_PATTERN = /^#{2,6}\s+Comment\s*$/i;
 const CODE_REF_SECTION_PATTERN = /^#{2,6}\s+Code\s+Ref\s*$/i;
 
-export const DOCUMENT_HEADER = [
-  "# Code Annotations",
-  "",
-  "Saved code refs and markdown comments live here for later AI-assisted work.",
-  "Paths in each Code Ref section are repo-relative to the workspace root.",
-  "",
-].join("\n");
+export function buildAnnotationsDocumentHeader(listName?: string): string {
+  return [
+    listName?.trim()
+      ? `# Code Annotations: ${listName.trim()}`
+      : "# Code Annotations",
+    "",
+    "Saved code refs and markdown comments live here for later AI-assisted work.",
+    "Paths in each Code Ref section are repo-relative to the workspace root.",
+    "",
+  ].join("\n");
+}
+
+export const DOCUMENT_HEADER = buildAnnotationsDocumentHeader();
 
 export interface ParsedAnnotationSection {
   entry: AnnotationEntry;
   start: number;
   end: number;
+  startLine: number;
 }
 
 export function formatAnnotationEntry(entry: AnnotationEntry): string {
@@ -89,11 +96,20 @@ export function collectAnnotationSections(
         entry,
         start,
         end,
+        startLine: contents.slice(0, start).split(/\r?\n/).length,
       };
     })
     .filter(
       (section): section is ParsedAnnotationSection => section !== undefined,
     );
+}
+
+export function parseAnnotationsDocumentTitle(
+  contents: string,
+): string | undefined {
+  const match = contents.match(/^#\s+Code Annotations(?::\s*(.+))?\s*$/m);
+  const title = match?.[1]?.trim();
+  return title ? title : undefined;
 }
 
 function parseAnnotationSection(section: string): AnnotationEntry | undefined {

@@ -8,9 +8,17 @@ export type {
 } from "./annotations/model";
 export { getAnnotationTypeOptions } from "./annotations/model";
 export { formatAnnotationLocation } from "./annotations/presentation";
+export type { AnnotationList } from "./annotations/lists";
+export {
+  createAnnotationList,
+  getNamedAnnotationListsPath,
+  loadAnnotationLists,
+} from "./annotations/lists";
 export {
   appendAnnotation,
+  deleteAnnotation,
   ensureAnnotationsDocument,
+  findAnnotationSection,
   getAnnotationsDocumentPath,
   getAnnotationsDocumentUri,
   isAnnotationsDocument,
@@ -21,4 +29,8 @@ export {
   canFixAnnotationLocation,
   resolveAnnotationLocation,
 } from "./annotations/resolution";
-export { AnnotationTreeItem, AnnotationTreeProvider } from "./annotations/tree";
+export {
+  AnnotationListTreeItem,
+  AnnotationTreeItem,
+  AnnotationTreeProvider,
+} from "./annotations/tree";

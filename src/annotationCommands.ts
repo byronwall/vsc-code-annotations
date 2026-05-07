@@ -2,15 +2,21 @@ import * as vscode from "vscode";
 
 import {
   AnnotationEntry,
+  AnnotationList,
+  AnnotationListTreeItem,
   AnnotationTreeItem,
-  AnnotationTreeProvider,
   appendAnnotation,
   canFixAnnotationLocation,
+  createAnnotationList,
+  deleteAnnotation,
   ensureAnnotationsDocument,
+  findAnnotationSection,
   formatAnnotationLocation,
+  loadAnnotationLists,
   updateAnnotationCodeRef,
 } from "./annotations";
 import { summarizeAnnotationForUi } from "./annotations/presentation";
+import { AnnotationListState } from "./annotationListState";
 import {
   buildSelectionDraft,
   pickAnnotationType,
@@ -19,19 +25,23 @@ import {
 import { openSourceLocation } from "./annotationNavigation";
 import {
   loadResolvedAnnotationsForDocument,
+  ResolvedAnnotation,
   resolveActiveWorkspaceFolder,
 } from "./annotationWorkspace";
 
 export const FILE_ANNOTATION_SUMMARY_COMMAND =
   "codeAnnotations.openFileAnnotations";
 
+type RefreshAnnotations = () => void;
+
 export async function addAnnotation(
-  treeProvider: AnnotationTreeProvider,
+  listState: AnnotationListState,
+  refreshAnnotations: RefreshAnnotations,
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
   if (!editor || editor.document.uri.scheme !== "file") {
     vscode.window.showWarningMessage(
-      "Open a workspace file and select code before adding an annotation.",
+      "Open a workspace file before adding an annotation.",
     );
     return;
   }
@@ -47,10 +57,12 @@ export async function addAnnotation(
   const selectionDraft = buildSelectionDraft(editor, workspaceFolder);
   if (!selectionDraft) {
     vscode.window.showWarningMessage(
-      "Select one or more lines of code before adding an annotation.",
+      "Open a non-empty workspace file before adding an annotation.",
     );
     return;
   }
+
+  const activeList = await listState.resolveActiveList(workspaceFolder);
 
   const type = await pickAnnotationType(selectionDraft);
   if (!type) {
@@ -62,21 +74,30 @@ export async function addAnnotation(
     return;
   }
 
-  const entry = await appendAnnotation(workspaceFolder, {
-    ...selectionDraft,
-    type,
-    comment,
-  });
+  const entry = await appendAnnotation(
+    workspaceFolder,
+    {
+      ...selectionDraft,
+      type,
+      comment,
+    },
+    activeList.documentUri,
+  );
 
-  treeProvider.refresh();
+  refreshAnnotations();
   vscode.window.setStatusBarMessage(
-    `Saved annotation for ${formatAnnotationLocation(entry)}`,
+    `Saved annotation in ${activeList.name} for ${formatAnnotationLocation(entry)}`,
     3000,
   );
 }
 
-export async function openAnnotationsDocument(): Promise<void> {
-  const workspaceFolder = resolveActiveWorkspaceFolder();
+export async function openAnnotationsDocument(
+  listState: AnnotationListState,
+  target?: AnnotationListTreeItem | AnnotationTreeItem | AnnotationList,
+): Promise<void> {
+  const workspaceFolder = resolveActiveWorkspaceFolder(
+    resolveListTarget(target)?.documentUri,
+  );
   if (!workspaceFolder) {
     vscode.window.showWarningMessage(
       "Open a workspace folder before opening the annotations document.",
@@ -84,13 +105,20 @@ export async function openAnnotationsDocument(): Promise<void> {
     return;
   }
 
-  const documentUri = await ensureAnnotationsDocument(workspaceFolder);
+  const targetList =
+    resolveListTarget(target) ??
+    (await listState.resolveActiveList(workspaceFolder));
+  const documentUri = await ensureAnnotationsDocument(
+    workspaceFolder,
+    targetList.documentUri,
+    targetList.isDefault ? undefined : targetList.name,
+  );
   const document = await vscode.workspace.openTextDocument(documentUri);
   await vscode.window.showTextDocument(document, { preview: false });
 }
 
 export async function fixAnnotationLocation(
-  treeProvider: AnnotationTreeProvider,
+  refreshAnnotations: RefreshAnnotations,
   target: AnnotationTreeItem | AnnotationEntry,
 ): Promise<void> {
   const workspaceFolder = resolveActiveWorkspaceFolder();
@@ -98,11 +126,12 @@ export async function fixAnnotationLocation(
     return;
   }
 
-  const entry = target instanceof AnnotationTreeItem ? target.entry : target;
-  const resolution =
-    target instanceof AnnotationTreeItem
-      ? target.resolution
-      : await loadResolution(workspaceFolder, entry);
+  const resolved = await resolveAnnotationTarget(workspaceFolder, target);
+  if (!resolved) {
+    return;
+  }
+
+  const { entry, list, resolution } = resolved;
 
   if (!canFixAnnotationLocation(resolution)) {
     if (resolution.status === "current") {
@@ -122,6 +151,7 @@ export async function fixAnnotationLocation(
     workspaceFolder,
     entry,
     resolution,
+    list.documentUri,
   );
   if (!updatedEntry) {
     vscode.window.showWarningMessage(
@@ -130,11 +160,132 @@ export async function fixAnnotationLocation(
     return;
   }
 
-  treeProvider.refresh();
+  refreshAnnotations();
   vscode.window.setStatusBarMessage(
     `Updated annotation to ${formatAnnotationLocation(updatedEntry)}`,
     3000,
   );
+}
+
+export async function createNewAnnotationList(
+  listState: AnnotationListState,
+  refreshAnnotations: RefreshAnnotations,
+): Promise<void> {
+  const workspaceFolder = resolveActiveWorkspaceFolder();
+  if (!workspaceFolder) {
+    vscode.window.showWarningMessage(
+      "Open a workspace folder before creating an annotation list.",
+    );
+    return;
+  }
+
+  const name = await vscode.window.showInputBox({
+    title: "New annotation list",
+    prompt: "Create a dedicated markdown file for a new annotation list.",
+    placeHolder: "Example: Refactor follow-ups",
+    ignoreFocusOut: true,
+    validateInput: (value) =>
+      value.trim().length > 0 ? undefined : "List name is required.",
+  });
+  if (!name) {
+    return;
+  }
+
+  const list = await createAnnotationList(workspaceFolder, name);
+  await listState.setActiveList(workspaceFolder, list);
+  refreshAnnotations();
+  vscode.window.setStatusBarMessage(
+    `Created annotation list ${list.name} and marked it active.`,
+    3000,
+  );
+}
+
+export async function setActiveAnnotationList(
+  listState: AnnotationListState,
+  refreshAnnotations: RefreshAnnotations,
+  target?: AnnotationListTreeItem | AnnotationList,
+): Promise<void> {
+  const explicitTarget =
+    target instanceof AnnotationListTreeItem ? target.list : target;
+  const workspaceFolder = resolveActiveWorkspaceFolder(
+    explicitTarget?.documentUri,
+  );
+  if (!workspaceFolder) {
+    vscode.window.showWarningMessage(
+      "Open a workspace folder before choosing an annotation list.",
+    );
+    return;
+  }
+
+  const list =
+    explicitTarget ?? (await pickAnnotationList(workspaceFolder, listState));
+  if (!list) {
+    return;
+  }
+
+  await listState.setActiveList(workspaceFolder, list);
+  refreshAnnotations();
+  vscode.window.setStatusBarMessage(
+    `Marked ${list.name} as the active annotation list.`,
+    3000,
+  );
+}
+
+export async function openAnnotationDocumentLocation(
+  target: AnnotationTreeItem,
+): Promise<void> {
+  const workspaceFolder = resolveActiveWorkspaceFolder(target.list.documentUri);
+  if (!workspaceFolder) {
+    return;
+  }
+
+  const section = await findAnnotationSection(
+    workspaceFolder,
+    target.entry,
+    target.list.documentUri,
+  );
+  if (!section) {
+    vscode.window.showWarningMessage(
+      "Unable to find this annotation inside the annotations document.",
+    );
+    return;
+  }
+
+  await showDocumentAtLine(target.list.documentUri, section.startLine);
+}
+
+export async function removeAnnotation(
+  refreshAnnotations: RefreshAnnotations,
+  target: AnnotationTreeItem,
+): Promise<void> {
+  const workspaceFolder = resolveActiveWorkspaceFolder(target.list.documentUri);
+  if (!workspaceFolder) {
+    return;
+  }
+
+  const confirmed = await vscode.window.showWarningMessage(
+    `Delete this annotation from ${target.list.name}?`,
+    { modal: true },
+    "Delete",
+  );
+  if (confirmed !== "Delete") {
+    return;
+  }
+
+  const deleted = await deleteAnnotation(
+    workspaceFolder,
+    target.entry,
+    target.list.documentUri,
+  );
+  if (!deleted) {
+    vscode.window.showWarningMessage(
+      "Unable to delete the annotation from the annotations document.",
+    );
+    return;
+  }
+
+  refreshAnnotations();
+  vscode.window.setStatusBarMessage("Deleted annotation.", 3000);
 }
 
 export async function openFileAnnotations(
@@ -159,14 +310,9 @@ export async function openFileAnnotations(
   }
 
   const picked = await vscode.window.showQuickPick(
-    fileAnnotations.map(({ entry, resolution }) => ({
+    fileAnnotations.map(({ entry, list, resolution }) => ({
       label: summarizeAnnotationForUi(entry),
-      description:
-        resolution.status === "current"
-          ? formatAnnotationLocation(entry)
-          : `${formatAnnotationLocation(entry)} -> ${formatAnnotationLocation(
-              resolution,
-            )}`,
+      description: `${list.name} • ${formatAnnotationLocation(entry)}`,
       detail: describeResolution(resolution),
       annotation: entry,
     })),
@@ -194,18 +340,96 @@ function describeResolution(resolution: { status: string }): string {
   return "Jumps to the saved location";
 }
 
-async function loadResolution(
+async function resolveAnnotationTarget(
   workspaceFolder: vscode.WorkspaceFolder,
-  entry: AnnotationEntry,
-) {
+  target: AnnotationTreeItem | AnnotationEntry,
+): Promise<ResolvedAnnotation> {
+  if (target instanceof AnnotationTreeItem) {
+    return {
+      entry: target.entry,
+      list: target.list,
+      resolution: target.resolution,
+    };
+  }
+
   const matches = await loadResolvedAnnotationsForDocument(
     workspaceFolder,
-    vscode.Uri.joinPath(workspaceFolder.uri, ...entry.relativePath.split("/")),
+    vscode.Uri.joinPath(workspaceFolder.uri, ...target.relativePath.split("/")),
   );
   return (
-    matches.find((match) => match.entry.addedAt === entry.addedAt)
-      ?.resolution ?? targetFallbackResolution(entry)
+    matches.find((match) => match.entry.addedAt === target.addedAt) ?? {
+      entry: target,
+      list: await resolveDefaultList(workspaceFolder),
+      resolution: targetFallbackResolution(target),
+    }
   );
+}
+
+async function resolveDefaultList(
+  workspaceFolder: vscode.WorkspaceFolder,
+): Promise<AnnotationList> {
+  return (await loadAnnotationLists(workspaceFolder))[0];
+}
+
+async function pickAnnotationList(
+  workspaceFolder: vscode.WorkspaceFolder,
+  listState: AnnotationListState,
+): Promise<AnnotationList | undefined> {
+  const [lists, activeList] = await Promise.all([
+    loadAnnotationLists(workspaceFolder),
+    listState.resolveActiveList(workspaceFolder),
+  ]);
+  const picked = await vscode.window.showQuickPick(
+    lists.map((list) => ({
+      label: list.name,
+      description:
+        list.relativePath === activeList.relativePath ? "Active" : undefined,
+      detail: list.relativePath,
+      list,
+    })),
+    {
+      title: "Active annotation list",
+      placeHolder: "Choose the list used for new annotations",
+      ignoreFocusOut: true,
+    },
+  );
+
+  return picked?.list;
+}
+
+function resolveListTarget(
+  target?: AnnotationListTreeItem | AnnotationTreeItem | AnnotationList,
+): AnnotationList | undefined {
+  if (!target) {
+    return undefined;
+  }
+
+  if (target instanceof AnnotationTreeItem) {
+    return target.list;
+  }
+
+  if (target instanceof AnnotationListTreeItem) {
+    return target.list;
+  }
+
+  return target;
+}
+
+async function showDocumentAtLine(
+  documentUri: vscode.Uri,
+  lineNumber: number,
+): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(documentUri);
+  const line = Math.min(
+    Math.max(lineNumber - 1, 0),
+    Math.max(document.lineCount - 1, 0),
+  );
+  const selection = new vscode.Range(line, 0, line, 0);
+  const editor = await vscode.window.showTextDocument(document, {
+    preview: false,
+    selection,
+  });
+  editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
 }
 
 function targetFallbackResolution(entry: AnnotationEntry) {
