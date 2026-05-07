@@ -1,0 +1,136 @@
+{
+    "name": "vsc-code-annotations",
+    "displayName": "Code Annotations",
+    "description": "Capture code selections as markdown annotations for later AI-assisted implementation work",
+    "version": "0.0.4",
+    "publisher": "byronwall",
+    "license": "SEE LICENSE IN LICENSE",
+    "icon": "assets/icon.png",
+    "galleryBanner": {
+        "color": "#18333A",
+        "theme": "dark"
+    },
+    "keywords": [
+        "annotations",
+        "code-comments",
+        "ai",
+        "markdown",
+        "workspace"
+    ],
+    "pricing": "Free",
+    "engines": {
+        "vscode": "^1.95.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onCommand:codeAnnotations.addAnnotation",
+        "onCommand:codeAnnotations.openAnnotationsSidebar",
+        "onCommand:codeAnnotations.openAnnotationsDocument",
+        "onView:codeAnnotations.annotations"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "codeAnnotations.addAnnotation",
+                "category": "Code Annotations",
+                "title": "Add Annotation",
+                "icon": "$(comment-add)"
+            },
+            {
+                "command": "codeAnnotations.openAnnotationsSidebar",
+                "category": "Code Annotations",
+                "title": "Open Annotations Sidebar",
+                "icon": "$(list-tree)"
+            },
+            {
+                "command": "codeAnnotations.openAnnotationsDocument",
+                "category": "Code Annotations",
+                "title": "Open Annotations Document",
+                "icon": "$(go-to-file)"
+            },
+            {
+                "command": "codeAnnotations.refresh",
+                "category": "Code Annotations",
+                "title": "Refresh Annotations",
+                "icon": "$(refresh)"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "codeAnnotations",
+                    "title": "Annotations",
+                    "icon": "$(comment-discussion)"
+                }
+            ]
+        },
+        "views": {
+            "codeAnnotations": [
+                {
+                    "id": "codeAnnotations.annotations",
+                    "name": "Workspace Annotations"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "codeAnnotations.openAnnotationsDocument",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "codeAnnotations.addAnnotation",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "codeAnnotations.refresh",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@2"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "codeAnnotations.addAnnotation",
+                    "when": "editorTextFocus && editorHasSelection",
+                    "group": "navigation@1"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "Code Annotations",
+            "properties": {
+                "codeAnnotations.documentPath": {
+                    "type": "string",
+                    "default": "code-annotations.md",
+                    "description": "Workspace-relative markdown file used to store saved code annotations."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "pnpm run compile",
+        "bundle:extension": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node20 --external:vscode --outfile=out/extension.js",
+        "typecheck": "tsc -p ./ --noEmit",
+        "compile": "pnpm run typecheck && pnpm run bundle:extension",
+        "watch": "tsc -watch -p ./",
+        "package:vsix": "pnpm run compile && vsce package --no-dependencies -o vsc-code-annotations.vsix",
+        "publish:vsix": "vsce publish --packagePath vsc-code-annotations.vsix",
+        "publish:patch": "pnpm run compile && vsce publish patch --no-dependencies",
+        "publish:minor": "pnpm run compile && vsce publish minor --no-dependencies",
+        "install:vsix": "code --install-extension vsc-code-annotations.vsix --force",
+        "build:install": "pnpm run package:vsix && pnpm run install:vsix",
+        "dev:host": "code --extensionDevelopmentPath=$PWD $PWD"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.1",
+        "@types/vscode": "^1.95.0",
+        "@vscode/vsce": "^3.7.1",
+        "esbuild": "^0.27.4",
+        "typescript": "^5.7.2"
+    }
+}
