@@ -6,6 +6,8 @@ tsconfig.json
 pnpm-lock.yaml
 AGENTS.md
 TODO.md
+.agents/**
+tmp/**
 scripts/**
 *.vsix
 **/*.map
