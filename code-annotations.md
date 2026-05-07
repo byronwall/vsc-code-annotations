@@ -1,13 +1,22 @@
 # Code Annotations
 
-This file stores code selections, annotation types, and comments for later AI-assisted implementation work.
+This file stores code selections, annotation types, and markdown comments for later AI-assisted implementation work.
 
-## [follow-up] package.json:118-122
-- File: package.json
-- Lines: 118-122
-- Type: follow-up
-- Comment: What is all this doing?
-- Added: 2026-05-07T13:25:53.384Z
+Paths in each Code Ref section are repo-relative to the workspace root.
+
+## [follow-up] package.json:145-149
+
+Added: 2026-05-07T13:25:53.384Z
+Type: follow-up
+
+### Comment
+
+What is all this doing, and how so?
+
+### Code ref
+
+Path: package.json
+Lines: 145-149
 
 ```json
 "typecheck": "tsc -p ./ --noEmit",

@@ -24,12 +24,6 @@
     "categories": [
         "Other"
     ],
-    "activationEvents": [
-        "onCommand:codeAnnotations.addAnnotation",
-        "onCommand:codeAnnotations.openAnnotationsSidebar",
-        "onCommand:codeAnnotations.openAnnotationsDocument",
-        "onView:codeAnnotations.annotations"
-    ],
     "main": "./out/extension.js",
     "contributes": {
         "commands": [
@@ -38,6 +32,12 @@
                 "category": "Code Annotations",
                 "title": "Add Annotation",
                 "icon": "$(comment-add)"
+            },
+            {
+                "command": "codeAnnotations.fixAnnotationLocation",
+                "category": "Code Annotations",
+                "title": "Fix Annotation Code Ref",
+                "icon": "$(wrench)"
             },
             {
                 "command": "codeAnnotations.openAnnotationsSidebar",
@@ -58,6 +58,20 @@
                 "icon": "$(refresh)"
             }
         ],
+        "keybindings": [
+            {
+                "command": "codeAnnotations.addAnnotation",
+                "key": "ctrl+shift+0",
+                "mac": "cmd+shift+0",
+                "when": "editorTextFocus && editorHasSelection"
+            },
+            {
+                "command": "codeAnnotations.addAnnotation",
+                "key": "ctrl+shift+numpad0",
+                "mac": "cmd+shift+numpad0",
+                "when": "editorTextFocus && editorHasSelection"
+            }
+        ],
         "viewsContainers": {
             "activitybar": [
                 {
@@ -71,7 +85,8 @@
             "codeAnnotations": [
                 {
                     "id": "codeAnnotations.annotations",
-                    "name": "Workspace Annotations"
+                    "name": "Workspace Annotations",
+                    "icon": "assets/icon.png"
                 }
             ]
         },
@@ -79,16 +94,19 @@
             "view/title": [
                 {
                     "command": "codeAnnotations.openAnnotationsDocument",
+                    "icon": "$(go-to-file)",
                     "when": "view == codeAnnotations.annotations",
                     "group": "navigation@1"
                 },
                 {
                     "command": "codeAnnotations.addAnnotation",
+                    "icon": "$(comment-add)",
                     "when": "view == codeAnnotations.annotations",
                     "group": "navigation@1"
                 },
                 {
                     "command": "codeAnnotations.refresh",
+                    "icon": "$(refresh)",
                     "when": "view == codeAnnotations.annotations",
                     "group": "navigation@2"
                 }
@@ -99,6 +117,14 @@
                     "when": "editorTextFocus && editorHasSelection",
                     "group": "navigation@1"
                 }
+            ],
+            "view/item/context": [
+                {
+                    "command": "codeAnnotations.fixAnnotationLocation",
+                    "icon": "$(wrench)",
+                    "when": "view == codeAnnotations.annotations && viewItem == annotationEntryRelocated",
+                    "group": "inline@1"
+                }
             ]
         },
         "configuration": {
@@ -106,8 +132,8 @@
             "properties": {
                 "codeAnnotations.documentPath": {
                     "type": "string",
-                    "default": "code-annotations.md",
-                    "description": "Workspace-relative markdown file used to store saved code annotations."
+                    "default": ".annotations/code-annotations.md",
+                    "description": "Workspace-relative markdown file used to store saved code annotations. Paths recorded inside it are repo-relative to the workspace root."
                 }
             }
         }

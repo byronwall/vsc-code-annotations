@@ -6,6 +6,10 @@
 - `src/extension.ts` owns activation, command registration, selection capture, and sidebar refresh wiring.
 - `src/annotations.ts` owns the annotations document path, markdown append format, parsing, and tree item rendering.
 
+## Code quality
+
+- Aim to keep files below 200-300 LOC. If we go beyond that, we should proactively refactor into smaller files that are easier to review/compose.
+
 ## Critical workflows
 
 - Install deps: `pnpm install`
