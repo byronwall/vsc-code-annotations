@@ -234,7 +234,155 @@
                     "description": "Workspace-relative markdown file used to store saved code annotations. Paths recorded inside it are repo-relative to the workspace root."
                 }
             }
-        }
+        },
+        "languageModelTools": [
+            {
+                "name": "create_code_annotation",
+                "displayName": "Create Code Annotation",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "create-annotation",
+                "icon": "$(comment-add)",
+                "userDescription": "Create one annotation entry in the workspace annotations markdown file.",
+                "modelDescription": "Create a single code annotation in this workspace by appending a canonical entry to the active annotation list or to a named list. Use this when a review identifies one specific issue, follow-up, question, idea, or context note tied to a file or a line range. The tool converts absolute file paths into repo-relative paths, derives the stored code snippet from the current file contents for selection annotations, and stores whole-file annotations with an empty code block. Do not use this for reading annotations or for creating many annotations at once.",
+                "when": "workspaceFolderCount > 0",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "listName": {
+                            "type": "string",
+                            "description": "Optional annotation list name. When omitted, the active annotation list for the workspace is used."
+                        },
+                        "createListIfMissing": {
+                            "type": "boolean",
+                            "description": "If true and listName does not exist yet, create a new annotation list markdown file for that name."
+                        },
+                        "filePath": {
+                            "type": "string",
+                            "description": "Absolute path to the workspace file that should be annotated."
+                        },
+                        "startLine": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "1-based inclusive start line for a selection annotation. Omit this and endLine for a whole-file annotation unless scope is explicitly set to file."
+                        },
+                        "endLine": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "1-based inclusive end line for a selection annotation. Defaults to startLine when omitted."
+                        },
+                        "scope": {
+                            "type": "string",
+                            "enum": [
+                                "selection",
+                                "file"
+                            ],
+                            "description": "Use selection to annotate a specific line range, or file to annotate the whole file. If omitted, the extension infers file when no line numbers are provided and selection otherwise."
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "follow-up",
+                                "issue",
+                                "question",
+                                "idea",
+                                "context"
+                            ],
+                            "description": "Annotation category. Choose the smallest accurate type for the review finding."
+                        },
+                        "comment": {
+                            "type": "string",
+                            "description": "Markdown comment body stored in the annotation's Comment section. Include the review finding, rationale, and next step."
+                        }
+                    },
+                    "required": [
+                        "filePath",
+                        "type",
+                        "comment"
+                    ]
+                }
+            },
+            {
+                "name": "create_code_annotations",
+                "displayName": "Create Code Annotations",
+                "canBeReferencedInPrompt": true,
+                "toolReferenceName": "create-annotations",
+                "icon": "$(list-selection)",
+                "userDescription": "Create multiple annotation entries in one call, typically from a code review.",
+                "modelDescription": "Create many code annotations in one call, usually for a review or audit that produced several findings. Use this when you have a batch of file locations and comments that should all be written into the workspace annotations markdown format. The tool validates every target file and line range first, then appends the canonical annotation blocks to the active list or to a named list, creating that list if requested. Prefer this tool over repeated single-annotation calls when recording a thorough review.",
+                "when": "workspaceFolderCount > 0",
+                "inputSchema": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "listName": {
+                            "type": "string",
+                            "description": "Optional annotation list name. When omitted, the active annotation list for each workspace is used."
+                        },
+                        "createListIfMissing": {
+                            "type": "boolean",
+                            "description": "If true and listName does not exist yet, create a new annotation list markdown file for that name."
+                        },
+                        "annotations": {
+                            "type": "array",
+                            "minItems": 1,
+                            "description": "The annotations to create. Use one item per review finding.",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "properties": {
+                                    "filePath": {
+                                        "type": "string",
+                                        "description": "Absolute path to the workspace file that should be annotated."
+                                    },
+                                    "startLine": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "description": "1-based inclusive start line for a selection annotation. Omit this and endLine for a whole-file annotation unless scope is explicitly set to file."
+                                    },
+                                    "endLine": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                        "description": "1-based inclusive end line for a selection annotation. Defaults to startLine when omitted."
+                                    },
+                                    "scope": {
+                                        "type": "string",
+                                        "enum": [
+                                            "selection",
+                                            "file"
+                                        ],
+                                        "description": "Use selection to annotate a specific line range, or file to annotate the whole file. If omitted, the extension infers file when no line numbers are provided and selection otherwise."
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "follow-up",
+                                            "issue",
+                                            "question",
+                                            "idea",
+                                            "context"
+                                        ],
+                                        "description": "Annotation category. Choose the smallest accurate type for the review finding."
+                                    },
+                                    "comment": {
+                                        "type": "string",
+                                        "description": "Markdown comment body stored in the annotation's Comment section. Include the review finding, rationale, and next step."
+                                    }
+                                },
+                                "required": [
+                                    "filePath",
+                                    "type",
+                                    "comment"
+                                ]
+                            }
+                        }
+                    },
+                    "required": [
+                        "annotations"
+                    ]
+                }
+            }
+        ]
     },
     "scripts": {
         "vscode:prepublish": "pnpm run compile",
