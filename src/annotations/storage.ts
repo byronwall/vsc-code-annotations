@@ -314,6 +314,7 @@ function isSameAnnotationEntry(
     left.relativePath === right.relativePath &&
     left.startLine === right.startLine &&
     left.endLine === right.endLine &&
+    left.scope === right.scope &&
     left.type === right.type &&
     left.comment === right.comment
   );

@@ -57,7 +57,7 @@ export async function addAnnotation(
   const selectionDraft = buildSelectionDraft(editor, workspaceFolder);
   if (!selectionDraft) {
     vscode.window.showWarningMessage(
-      "Open a non-empty workspace file before adding an annotation.",
+      "Select some non-whitespace text, or clear the selection to annotate the whole file.",
     );
     return;
   }
@@ -232,17 +232,29 @@ export async function setActiveAnnotationList(
 }
 
 export async function openAnnotationDocumentLocation(
-  target: AnnotationTreeItem,
+  target: AnnotationTreeItem | AnnotationEntry,
 ): Promise<void> {
-  const workspaceFolder = resolveActiveWorkspaceFolder(target.list.documentUri);
+  const workspaceFolder = resolveActiveWorkspaceFolder(
+    target instanceof AnnotationTreeItem ? target.list.documentUri : undefined,
+  );
   if (!workspaceFolder) {
     return;
   }
 
+  const resolved = await resolveAnnotationTarget(workspaceFolder, target);
+  if (!resolved) {
+    vscode.window.showWarningMessage(
+      "Unable to find this annotation inside the annotations document.",
+    );
+    return;
+  }
+
+  const { entry, list } = resolved;
+
   const section = await findAnnotationSection(
     workspaceFolder,
-    target.entry,
-    target.list.documentUri,
+    entry,
+    list.documentUri,
   );
   if (!section) {
     vscode.window.showWarningMessage(
@@ -251,20 +263,32 @@ export async function openAnnotationDocumentLocation(
     return;
   }
 
-  await showDocumentAtLine(target.list.documentUri, section.startLine);
+  await showDocumentAtLine(list.documentUri, section.startLine);
 }
 
 export async function removeAnnotation(
   refreshAnnotations: RefreshAnnotations,
-  target: AnnotationTreeItem,
+  target: AnnotationTreeItem | AnnotationEntry,
 ): Promise<void> {
-  const workspaceFolder = resolveActiveWorkspaceFolder(target.list.documentUri);
+  const workspaceFolder = resolveActiveWorkspaceFolder(
+    target instanceof AnnotationTreeItem ? target.list.documentUri : undefined,
+  );
   if (!workspaceFolder) {
     return;
   }
 
+  const resolved = await resolveAnnotationTarget(workspaceFolder, target);
+  if (!resolved) {
+    vscode.window.showWarningMessage(
+      "Unable to find this annotation in the annotations document.",
+    );
+    return;
+  }
+
+  const { entry, list } = resolved;
+
   const confirmed = await vscode.window.showWarningMessage(
-    `Delete this annotation from ${target.list.name}?`,
+    `Delete this annotation from ${list.name}?`,
     { modal: true },
     "Delete",
   );
@@ -274,8 +298,8 @@ export async function removeAnnotation(
 
   const deleted = await deleteAnnotation(
     workspaceFolder,
-    target.entry,
-    target.list.documentUri,
+    entry,
+    list.documentUri,
   );
   if (!deleted) {
     vscode.window.showWarningMessage(
@@ -343,7 +367,7 @@ function describeResolution(resolution: { status: string }): string {
 async function resolveAnnotationTarget(
   workspaceFolder: vscode.WorkspaceFolder,
   target: AnnotationTreeItem | AnnotationEntry,
-): Promise<ResolvedAnnotation> {
+): Promise<ResolvedAnnotation | undefined> {
   if (target instanceof AnnotationTreeItem) {
     return {
       entry: target.entry,
@@ -356,19 +380,7 @@ async function resolveAnnotationTarget(
     workspaceFolder,
     vscode.Uri.joinPath(workspaceFolder.uri, ...target.relativePath.split("/")),
   );
-  return (
-    matches.find((match) => match.entry.addedAt === target.addedAt) ?? {
-      entry: target,
-      list: await resolveDefaultList(workspaceFolder),
-      resolution: targetFallbackResolution(target),
-    }
-  );
-}
-
-async function resolveDefaultList(
-  workspaceFolder: vscode.WorkspaceFolder,
-): Promise<AnnotationList> {
-  return (await loadAnnotationLists(workspaceFolder))[0];
+  return matches.find((match) => match.entry.addedAt === target.addedAt);
 }
 
 async function pickAnnotationList(
@@ -430,12 +442,4 @@ async function showDocumentAtLine(
     selection,
   });
   editor.revealRange(selection, vscode.TextEditorRevealType.InCenter);
-}
-
-function targetFallbackResolution(entry: AnnotationEntry) {
-  return {
-    ...entry,
-    status: "missing" as const,
-    score: 0,
-  };
 }

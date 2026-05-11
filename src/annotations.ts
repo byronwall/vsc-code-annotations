@@ -3,10 +3,14 @@ export type {
   AnnotationDraft,
   AnnotationEntry,
   AnnotationLocationResolution,
+  AnnotationScope,
   AnnotationType,
   AnnotationTypeOption,
 } from "./annotations/model";
-export { getAnnotationTypeOptions } from "./annotations/model";
+export {
+  getAnnotationTypeOptions,
+  normalizeAnnotationScope,
+} from "./annotations/model";
 export { formatAnnotationLocation } from "./annotations/presentation";
 export type { AnnotationList } from "./annotations/lists";
 export {

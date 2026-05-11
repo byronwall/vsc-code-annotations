@@ -19,27 +19,30 @@ export function buildSelectionDraft(
   workspaceFolder: vscode.WorkspaceFolder,
 ): AnnotationSelectionDraft | undefined {
   const selection = editor.selection;
-  const code = selection.isEmpty
-    ? editor.document.getText().trimEnd()
-    : editor.document.getText(selection).trimEnd();
-  if (!code.trim()) {
+  const scope = selection.isEmpty ? "file" : "selection";
+  const code =
+    scope === "file" ? "" : editor.document.getText(selection).trimEnd();
+  if (scope === "selection" && !code.trim()) {
     return undefined;
   }
 
   const relativePath = toPosix(
     path.relative(workspaceFolder.uri.fsPath, editor.document.uri.fsPath),
   );
-  const startLine = selection.isEmpty ? 1 : selection.start.line + 1;
-  const endLine = selection.isEmpty
-    ? editor.document.lineCount
-    : selection.end.character === 0 && selection.end.line > selection.start.line
-      ? selection.end.line
-      : selection.end.line + 1;
+  const startLine = scope === "file" ? 1 : selection.start.line + 1;
+  const endLine =
+    scope === "file"
+      ? Math.max(editor.document.lineCount, 1)
+      : selection.end.character === 0 &&
+          selection.end.line > selection.start.line
+        ? selection.end.line
+        : selection.end.line + 1;
 
   return {
     relativePath,
     startLine,
     endLine,
+    scope,
     code,
     language:
       editor.document.languageId && editor.document.languageId !== "plaintext"
@@ -59,7 +62,7 @@ export async function pickAnnotationType(
         relativePath: draft.relativePath,
         startLine: draft.startLine,
         endLine: draft.endLine,
-      })} • ${truncateForUi(draft.code, 120)}`,
+      })} • ${describeDraftTarget(draft, 120)}`,
       value: option.value,
     })),
     {
@@ -81,8 +84,11 @@ export async function promptForComment(
     endLine: draft.endLine,
   });
   const comment = await vscode.window.showInputBox({
-    title: `Comment on ${location}`,
-    prompt: truncateForUi(draft.code, 180),
+    title:
+      draft.scope === "file"
+        ? `Comment on ${draft.relativePath} (whole file)`
+        : `Comment on ${location}`,
+    prompt: describeDraftTarget(draft, 180),
     placeHolder:
       "Add a short note now; you can expand it with full markdown in the annotations document",
     ignoreFocusOut: true,
@@ -100,4 +106,15 @@ function truncateForUi(value: string, limit: number): string {
   }
 
   return `${normalized.slice(0, limit - 1)}...`;
+}
+
+function describeDraftTarget(
+  draft: AnnotationSelectionDraft,
+  limit: number,
+): string {
+  if (draft.scope === "file") {
+    return `whole file (${draft.relativePath})`;
+  }
+
+  return truncateForUi(draft.code, limit);
 }

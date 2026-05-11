@@ -1,16 +1,18 @@
 # Code Annotations
 
-Code Annotations is a VS Code extension prototype for capturing code selections into a workspace markdown document. The generated document is meant to be readable by humans and easy to hand to an AI agent as an implementation backlog.
+Code Annotations is a VS Code extension prototype for capturing code selections and whole-file notes into a workspace markdown document. The generated document is meant to be readable by humans and easy to hand to an AI agent as an implementation backlog.
 
 ## Features
 
 - Capture the current editor selection as an annotation.
+- Create a whole-file annotation by clearing the selection before running `Add Annotation`.
 - Choose an annotation type from a small quick-pick flow.
 - Add a comment with the file, line range, and code snippet already in context.
 - Append structured markdown entries to a workspace document.
-- Review saved annotations from a sidebar, jump back to the best current source match, and repair stale code refs inline.
-- See inline annotation lenses directly in annotated source files, including a file summary at the top of the file.
-- Use `Cmd+Shift+0` or `Cmd+Shift+Numpad0` on macOS to add an annotation from the current selection.
+- Review saved annotations from a sidebar, switch between flat and file-tree grouping, and keep the active file duplicated near the top for quick scanning.
+- Jump back to the best current source match, repair stale code refs inline, and open the raw markdown entry directly from the editor hover.
+- See inline annotation lenses directly in annotated source files, including a file summary at the top of the file and rich hovers with the full saved comment.
+- Use `Cmd+Shift+0` or `Cmd+Shift+Numpad0` on macOS to add an annotation from the current selection, or from the whole file when the selection is empty.
 
 ## Commands
 
@@ -29,6 +31,13 @@ Code Annotations is a VS Code extension prototype for capturing code selections 
 - Meaning: Workspace-relative markdown file used to store saved annotations. The paths stored inside each code ref are repo-relative to the workspace root.
 
 When the document lives under `.annotations/`, the extension adds `.annotations/` to the repo root `.gitignore` if that file exists and does not already contain an active or commented-out entry for it.
+
+### `codeAnnotations.sidebarGroupingMode`
+
+- Type: `string`
+- Default: `flat`
+- Values: `flat`, `file`
+- Meaning: Controls how annotations are grouped inside each annotation list in the sidebar. `file` adds a folder tree and duplicates the active file group into an `Active file` section near the top.
 
 ## Markdown Format
 
@@ -57,6 +66,8 @@ const provider = new AnnotationTreeProvider(resolveActiveWorkspaceFolder);
 ````
 
 The document header also calls out that `Path` values are repo-relative to the workspace root.
+
+Whole-file annotations use the same markdown shape, but the `Code ref` block stores `Scope: file` and leaves the fenced code block empty instead of copying the entire file contents.
 
 ## Development
 

@@ -17,6 +17,7 @@ import {
   removeAnnotation,
   setActiveAnnotationList,
 } from "./annotationCommands";
+import { AnnotationHoverProvider } from "./annotationHover";
 import { AnnotationListState } from "./annotationListState";
 import { openSourceLocation } from "./annotationNavigation";
 import { resolveActiveWorkspaceFolder } from "./annotationWorkspace";
@@ -32,6 +33,9 @@ export async function activate(
   const codeLensProvider = new AnnotationCodeLensProvider(
     resolveActiveWorkspaceFolder,
   );
+  const hoverProvider = new AnnotationHoverProvider(
+    resolveActiveWorkspaceFolder,
+  );
   const treeView = vscode.window.createTreeView("codeAnnotations.annotations", {
     treeDataProvider: treeProvider,
     showCollapseAll: false,
@@ -45,6 +49,7 @@ export async function activate(
       [{ scheme: "file" }],
       codeLensProvider,
     ),
+    vscode.languages.registerHoverProvider([{ scheme: "file" }], hoverProvider),
     vscode.commands.registerCommand(
       "codeAnnotations.addAnnotation",
       async () => {
@@ -89,6 +94,24 @@ export async function activate(
     vscode.commands.registerCommand("codeAnnotations.refresh", () => {
       refreshProviders(treeProvider, codeLensProvider);
     }),
+    vscode.commands.registerCommand(
+      "codeAnnotations.expandAnnotationsTree",
+      async () => {
+        await treeProvider.expandAll();
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.collapseAnnotationsTree",
+      async () => {
+        await treeProvider.collapseAll();
+      },
+    ),
+    vscode.commands.registerCommand(
+      "codeAnnotations.toggleSidebarGroupingMode",
+      async () => {
+        await toggleSidebarGroupingMode();
+      },
+    ),
     vscode.commands.registerCommand(
       "codeAnnotations.openSourceLocation",
       async (target: AnnotationTreeItem) => {
@@ -148,10 +171,20 @@ export async function activate(
       }
     }),
     vscode.window.onDidChangeActiveTextEditor(() => {
+      treeProvider.refresh();
       codeLensProvider.refresh();
     }),
+    treeView.onDidExpandElement(({ element }) => {
+      treeProvider.trackElementExpansion(element, true);
+    }),
+    treeView.onDidCollapseElement(({ element }) => {
+      treeProvider.trackElementExpansion(element, false);
+    }),
     vscode.workspace.onDidChangeConfiguration((event) => {
-      if (event.affectsConfiguration("codeAnnotations.documentPath")) {
+      if (
+        event.affectsConfiguration("codeAnnotations.documentPath") ||
+        event.affectsConfiguration("codeAnnotations.sidebarGroupingMode")
+      ) {
         refreshProviders(treeProvider, codeLensProvider);
       }
     }),
@@ -164,4 +197,26 @@ function refreshProviders(
 ): void {
   treeProvider.refresh();
   codeLensProvider.refresh();
+}
+
+async function toggleSidebarGroupingMode(): Promise<void> {
+  const configuration = vscode.workspace.getConfiguration("codeAnnotations");
+  const currentMode = configuration.get<"flat" | "file">(
+    "sidebarGroupingMode",
+    "flat",
+  );
+  const nextMode = currentMode === "file" ? "flat" : "file";
+
+  await configuration.update(
+    "sidebarGroupingMode",
+    nextMode,
+    vscode.ConfigurationTarget.Global,
+  );
+
+  vscode.window.setStatusBarMessage(
+    nextMode === "file"
+      ? "Annotations sidebar grouping: file tree"
+      : "Annotations sidebar grouping: flat list",
+    2500,
+  );
 }

@@ -58,6 +58,24 @@
                 "icon": "$(refresh)"
             },
             {
+                "command": "codeAnnotations.toggleSidebarGroupingMode",
+                "category": "Code Annotations",
+                "title": "Toggle Sidebar Grouping",
+                "icon": "$(list-tree)"
+            },
+            {
+                "command": "codeAnnotations.expandAnnotationsTree",
+                "category": "Code Annotations",
+                "title": "Expand All Annotation Groups",
+                "icon": "$(expand-all)"
+            },
+            {
+                "command": "codeAnnotations.collapseAnnotationsTree",
+                "category": "Code Annotations",
+                "title": "Collapse Annotation Groups",
+                "icon": "$(collapse-all)"
+            },
+            {
                 "command": "codeAnnotations.createAnnotationList",
                 "category": "Code Annotations",
                 "title": "New Annotation List",
@@ -139,6 +157,24 @@
                     "icon": "$(refresh)",
                     "when": "view == codeAnnotations.annotations",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "codeAnnotations.toggleSidebarGroupingMode",
+                    "icon": "$(list-tree)",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "codeAnnotations.expandAnnotationsTree",
+                    "icon": "$(expand-all)",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "codeAnnotations.collapseAnnotationsTree",
+                    "icon": "$(collapse-all)",
+                    "when": "view == codeAnnotations.annotations",
+                    "group": "navigation@2"
                 }
             ],
             "editor/context": [
@@ -178,6 +214,20 @@
         "configuration": {
             "title": "Code Annotations",
             "properties": {
+                "codeAnnotations.sidebarGroupingMode": {
+                    "type": "string",
+                    "enum": [
+                        "flat",
+                        "file"
+                    ],
+                    "enumDescriptions": [
+                        "Show annotations as a flat list inside each annotation list.",
+                        "Group annotations by workspace file using a folder tree inside each annotation list."
+                    ],
+                    "default": "flat",
+                    "scope": "application",
+                    "description": "Controls how annotations are grouped in the sidebar. This is a global user setting."
+                },
                 "codeAnnotations.documentPath": {
                     "type": "string",
                     "default": ".annotations/code-annotations.md",

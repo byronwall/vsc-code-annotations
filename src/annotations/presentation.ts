@@ -4,6 +4,7 @@ import {
   AnnotationEntry,
   AnnotationLocationResolution,
   AnnotationLocationStatus,
+  AnnotationScope,
 } from "./model";
 import {
   escapeMarkdown,
@@ -50,6 +51,25 @@ export function buildTreeItemDescription(
   return `${storedLocation} (needs review)`;
 }
 
+export function buildGroupedTreeItemDescription(
+  entry: AnnotationEntry,
+  resolution: AnnotationLocationResolution,
+): string {
+  const storedRange = formatLineRange(entry.startLine, entry.endLine);
+  if (resolution.status === "current") {
+    return storedRange;
+  }
+
+  if (resolution.status === "relocated") {
+    return `${storedRange} -> ${formatLineRange(
+      resolution.startLine,
+      resolution.endLine,
+    )}`;
+  }
+
+  return `${storedRange} (needs review)`;
+}
+
 export function buildTooltip(
   entry: AnnotationEntry,
   resolution: AnnotationLocationResolution,
@@ -63,6 +83,9 @@ export function buildTooltip(
   tooltip.appendMarkdown(`- Type: ${escapeMarkdown(entry.type)}\n`);
   tooltip.appendMarkdown(
     `- Saved Code Ref: ${escapeMarkdown(formatAnnotationLocation(entry))}\n`,
+  );
+  tooltip.appendMarkdown(
+    `- Scope: ${escapeMarkdown(formatAnnotationScope(entry.scope))}\n`,
   );
 
   if (resolution.status === "relocated") {
@@ -78,8 +101,26 @@ export function buildTooltip(
   }
 
   tooltip.appendMarkdown(`- Added: ${escapeMarkdown(entry.addedAt)}\n\n`);
-  tooltip.appendCodeblock(entry.code, entry.language);
+  appendStoredCodePreview(tooltip, entry);
   return tooltip;
+}
+
+export function formatAnnotationScope(scope: AnnotationScope): string {
+  return scope === "file" ? "whole file" : "selection";
+}
+
+export function appendStoredCodePreview(
+  markdown: vscode.MarkdownString,
+  entry: Pick<AnnotationEntry, "code" | "language" | "scope">,
+): void {
+  if (entry.scope === "file") {
+    markdown.appendMarkdown(
+      "_Whole-file annotation. Stored code block intentionally left blank._",
+    );
+    return;
+  }
+
+  markdown.appendCodeblock(entry.code, entry.language);
 }
 
 export function summarizeComment(entry: AnnotationEntry): string {

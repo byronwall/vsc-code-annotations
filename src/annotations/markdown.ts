@@ -1,4 +1,8 @@
-import { AnnotationEntry, normalizeAnnotationType } from "./model";
+import {
+  AnnotationEntry,
+  normalizeAnnotationScope,
+  normalizeAnnotationType,
+} from "./model";
 import { formatAnnotationLocation } from "./presentation";
 import {
   escapeForRegExp,
@@ -36,7 +40,8 @@ export interface ParsedAnnotationSection {
 
 export function formatAnnotationEntry(entry: AnnotationEntry): string {
   const comment = trimBlankLines(entry.comment.split(/\r?\n/)).join("\n");
-  const fence = selectFence(entry.code);
+  const code = normalizeCodeForStorage(entry.code);
+  const fence = selectFence(code);
   const fenceLine = entry.language?.trim()
     ? `${fence}${entry.language.trim()}`
     : fence;
@@ -54,10 +59,11 @@ export function formatAnnotationEntry(entry: AnnotationEntry): string {
     "### Code ref",
     "",
     `Path: ${entry.relativePath}`,
+    `Scope: ${entry.scope}`,
     `Lines: ${formatLineRange(entry.startLine, entry.endLine)}`,
     "",
     fenceLine,
-    normalizeCodeForStorage(entry.code),
+    code,
     fence,
     "",
     "",
@@ -172,6 +178,10 @@ function parseAnnotationSection(section: string): AnnotationEntry | undefined {
   const startLine = range?.startLine ?? Number.parseInt(heading[3], 10);
   const endLine =
     range?.endLine ?? Number.parseInt(heading[4] ?? heading[3], 10);
+  const scope =
+    normalizeAnnotationScope(
+      codeRefMetadata.get("scope") ?? legacyMetadata.get("scope"),
+    ) ?? "selection";
   const comment =
     trimBlankLines(commentLines).join("\n") ||
     legacyMetadata.get("comment") ||
@@ -188,6 +198,7 @@ function parseAnnotationSection(section: string): AnnotationEntry | undefined {
     relativePath,
     startLine,
     endLine,
+    scope,
     type,
     comment,
     addedAt,

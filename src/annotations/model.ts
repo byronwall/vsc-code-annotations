@@ -36,12 +36,14 @@ const ANNOTATION_TYPES = [
 ] as const;
 
 export type AnnotationType = (typeof ANNOTATION_TYPES)[number]["value"];
+export type AnnotationScope = "selection" | "file";
 export type AnnotationLocationStatus = "current" | "relocated" | "missing";
 
 export interface AnnotationCodeRef {
   relativePath: string;
   startLine: number;
   endLine: number;
+  scope: AnnotationScope;
   code: string;
   language?: string;
 }
@@ -81,6 +83,17 @@ export function normalizeAnnotationType(
 ): AnnotationType | undefined {
   const normalized = value.trim().toLowerCase();
   return ANNOTATION_TYPES.find((option) => option.value === normalized)?.value;
+}
+
+export function normalizeAnnotationScope(
+  value: string | undefined,
+): AnnotationScope | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (normalized === "selection" || normalized === "file") {
+    return normalized;
+  }
+
+  return undefined;
 }
 
 export function resolveTypeIcon(type: AnnotationType): string {

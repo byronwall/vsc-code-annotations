@@ -32,6 +32,19 @@ export async function resolveAnnotationLocation(
     };
   }
 
+  if (entry.scope === "file") {
+    return {
+      relativePath: entry.relativePath,
+      startLine: 1,
+      endLine: Math.max(document.lineCount, 1),
+      scope: "file",
+      code: "",
+      language: normalizeLanguageId(document.languageId) ?? entry.language,
+      status: "current",
+      score: 1,
+    };
+  }
+
   const currentLocation = findMatchWithinStoredRange(document, entry);
   if (currentLocation) {
     return {
@@ -70,7 +83,7 @@ export async function resolveAnnotationLocation(
 export function canFixAnnotationLocation(
   resolution: AnnotationLocationResolution,
 ): boolean {
-  return resolution.status === "relocated";
+  return resolution.scope !== "file" && resolution.status === "relocated";
 }
 
 async function openTextDocumentIfExists(
@@ -87,6 +100,11 @@ function findMatchWithinStoredRange(
   document: vscode.TextDocument,
   entry: AnnotationEntry,
 ): AnnotationLocationResolution | undefined {
+  const storedCode = normalizeCodeForStorage(entry.code);
+  if (!storedCode) {
+    return undefined;
+  }
+
   const lineRange = getFullLineRange(
     document,
     entry.startLine - 1,
@@ -97,19 +115,20 @@ function findMatchWithinStoredRange(
   }
 
   const rangeText = document.getText(lineRange);
-  const localIndex = rangeText.indexOf(entry.code);
+  const localIndex = rangeText.indexOf(storedCode);
   if (localIndex < 0) {
     return undefined;
   }
 
   const absoluteStart = document.offsetAt(lineRange.start) + localIndex;
-  const absoluteEnd = absoluteStart + entry.code.length;
+  const absoluteEnd = absoluteStart + storedCode.length;
   return buildResolutionFromOffsets(
     document,
     entry.relativePath,
     absoluteStart,
     absoluteEnd,
-    entry.code,
+    "selection",
+    storedCode,
     normalizeLanguageId(document.languageId) ?? entry.language,
     "current",
     1,
@@ -137,6 +156,7 @@ function findExactCodeMatches(
         relativePath,
         index,
         index + normalizedCode.length,
+        "selection",
         normalizedCode,
         normalizeLanguageId(document.languageId),
         "relocated",
@@ -206,6 +226,7 @@ function findBestApproximateMatch(
         document,
         entry.relativePath,
         range,
+        "selection",
         candidateCode,
         normalizeLanguageId(document.languageId) ?? entry.language,
         "relocated",
@@ -225,6 +246,7 @@ function buildResolutionFromOffsets(
   relativePath: string,
   startOffset: number,
   endOffset: number,
+  scope: "selection",
   code: string,
   language: string | undefined,
   status: "current" | "relocated",
@@ -239,6 +261,7 @@ function buildResolutionFromOffsets(
     relativePath,
     startLine: start.line + 1,
     endLine,
+    scope,
     code: normalizeCodeForStorage(code),
     language,
     startCharacter: start.character,
@@ -252,6 +275,7 @@ function buildResolutionFromRange(
   document: vscode.TextDocument,
   relativePath: string,
   range: vscode.Range,
+  scope: "selection",
   code: string,
   language: string | undefined,
   status: "relocated",
@@ -261,6 +285,7 @@ function buildResolutionFromRange(
     relativePath,
     startLine: range.start.line + 1,
     endLine: range.end.line + 1,
+    scope,
     code: normalizeCodeForStorage(code),
     language,
     startCharacter: range.start.character,
