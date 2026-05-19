@@ -123,7 +123,7 @@
                 {
                     "id": "codeAnnotations",
                     "title": "Annotations",
-                    "icon": "$(comment-discussion)"
+                    "icon": "assets/icon.png"
                 }
             ]
         },
