@@ -5,6 +5,10 @@
     "version": "0.0.4",
     "publisher": "byronwall",
     "license": "SEE LICENSE IN LICENSE",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/byronwall/vsc-code-annotations.git"
+    },
     "icon": "assets/icon.png",
     "galleryBanner": {
         "color": "#18333A",
