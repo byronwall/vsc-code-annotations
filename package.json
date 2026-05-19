@@ -2,7 +2,7 @@
     "name": "vsc-code-annotations",
     "displayName": "Code Annotations",
     "description": "Capture code selections as markdown annotations for later AI-assisted implementation work",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "publisher": "byronwall",
     "license": "SEE LICENSE IN LICENSE",
     "repository": {
