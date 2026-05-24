@@ -123,7 +123,7 @@
                 {
                     "id": "codeAnnotations",
                     "title": "Annotations",
-                    "icon": "assets/icon.png"
+                    "icon": "assets/activitybar-icon.svg"
                 }
             ]
         },
@@ -132,7 +132,7 @@
                 {
                     "id": "codeAnnotations.annotations",
                     "name": "Workspace Annotations",
-                    "icon": "assets/icon.png"
+                    "icon": "assets/activitybar-icon.svg"
                 }
             ]
         },
